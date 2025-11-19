@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sintra - Envio de Localização</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      background: #f5f5f5;
+    }
+    h1 { color: #2c3e50; }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background: #27ae60;
+      color: white;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #2c3e50;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sintra - GPS</h1>
+  <button onclick="iniciarEnvio()">Iniciar Envio</button>
+  <button onclick="pararEnvio()">Parar Envio</button>
+  <div id="status">Aguardando...</div>
+
+  <script>
+    const SERVER_URL = "http://192.168.0.112:8000/gps";
+
+    // Gerador do ID do veículo
+    const VEHICLE_ID = "carro-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+
+    let envioAtivo = false;
+    let intervalo;
+
+    function iniciarEnvio() {
+      if (envioAtivo) return;
+      envioAtivo = true;
+      document.getElementById("status").innerText = `Envio iniciado...\nID deste veículo: ${VEHICLE_ID}`;
+      intervalo = setInterval(obterLocalizacao, 5000); // Envio a cada 5s
+    }
+
+    function pararEnvio() {
+      envioAtivo = false;
+      clearInterval(intervalo);
+      document.getElementById("status").innerText += "\nEnvio de localização parado.";
+    }
+
+    function obterLocalizacao() {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            document.getElementById("status").innerText = 
+            `Última localização enviada:\nLat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}\nID: ${VEHICLE_ID}`;
+            enviarParaArduino(lat, lon);
+          },
+          (err) => {
+            document.getElementById("status").innerText = "Erro ao obter localização: " + err.message;
+          }
+        );
+      } else {
+        document.getElementById("status").innerText = 
+          "Geolocalização não suportada neste navegador.";
+      }
+    }
+
+    function enviarParaArduino(lat, lon) {
+      fetch(SERVER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: VEHICLE_ID, latitude: lat, longitude: lon })
+      })
+      .then(res => res.text())
+      .then(data => {
+        document.getElementById("status").innerText += "\nEnviado para Arduino!";
+        console.log("Resposta Arduino:", data);
+      })
+      .catch(err => {
+        document.getElementById("status").innerText += "\nErro ao enviar!";
+        console.error("Erro:", err);
+      });
+    }
+  </script>
+</body>
+</html>
